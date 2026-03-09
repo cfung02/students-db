@@ -1,0 +1,420 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>Prospects</title>
+  <link rel="stylesheet" href="style.css"/>
+  <style>
+    .modal-overlay {
+      display: none; position: fixed; inset: 0;
+      background: rgba(0,0,0,0.4); z-index: 100; align-items: center; justify-content: center;
+    }
+    .modal-overlay.open { display: flex; }
+    .modal {
+      background: white; border-radius: 10px; padding: 28px;
+      width: 100%; max-width: 560px; max-height: 90vh; overflow-y: auto;
+      box-shadow: 0 8px 32px rgba(0,0,0,0.18);
+    }
+    .modal h3 { margin-bottom: 18px; font-size: 16px; color: #333; }
+    .modal .close-btn { float: right; background: none; border: none; font-size: 20px; cursor: pointer; color: #999; padding: 0; }
+
+    .log-entry {
+      display: flex; gap: 12px; padding: 10px 0; border-bottom: 1px solid #f0f0f0;
+    }
+    .log-entry:last-child { border-bottom: none; }
+    .log-icon {
+      width: 32px; height: 32px; border-radius: 50%; display: flex;
+      align-items: center; justify-content: center; font-size: 14px; flex-shrink: 0;
+    }
+    .log-body { flex: 1; }
+    .log-action { font-size: 13px; font-weight: bold; color: #333; text-transform: capitalize; }
+    .log-note   { font-size: 13px; color: #555; margin-top: 2px; }
+    .log-time   { font-size: 11px; color: #aaa; margin-top: 3px; }
+    .log-delete { background: none; border: none; color: #ddd; cursor: pointer; font-size: 16px; padding: 0; }
+    .log-delete:hover { color: #e74c3c; }
+
+    .action-icon-inquiry_received    { background: #eaf4fb; }
+    .action-icon-status_changed      { background: #fef9e7; }
+    .action-icon-converted_to_student{ background: #eafaf1; }
+    .action-icon-called              { background: #f0f0f0; }
+    .action-icon-emailed             { background: #eaf4fb; }
+    .action-icon-toured              { background: #f5eef8; }
+    .action-icon-voicemail           { background: #fdf2e9; }
+    .action-icon-note                { background: #f8f9fa; }
+  </style>
+</head>
+<body>
+
+<nav>
+  <span class="brand">Daycare</span>
+  <a href="centers.html">Centers</a>
+  <a href="prospects.html" class="active">Prospects</a>
+  <a href="students.html">Students</a>
+</nav>
+
+<div class="container">
+  <div id="msg" class="msg"></div>
+
+  <!-- Form -->
+  <div class="card">
+    <h2 id="form-title">Log New Inquiry</h2>
+    <div class="form-row">
+      <div class="form-group">
+        <label>First Name *</label>
+        <input id="f-first" type="text" placeholder="First name"/>
+      </div>
+      <div class="form-group">
+        <label>Last Name *</label>
+        <input id="f-last" type="text" placeholder="Last name"/>
+      </div>
+      <div class="form-group">
+        <label>Email</label>
+        <input id="f-email" type="email" placeholder="email@example.com"/>
+      </div>
+      <div class="form-group">
+        <label>Phone</label>
+        <input id="f-phone" type="text" placeholder="(555) 000-0000"/>
+      </div>
+    </div>
+    <div class="form-row" style="margin-top:12px">
+      <div class="form-group">
+        <label>Center</label>
+        <select id="f-center"><option value="">— Select Center —</option></select>
+      </div>
+      <div class="form-group">
+        <label>Interested Session</label>
+        <select id="f-session">
+          <option value="">— Select —</option>
+          <option value="spring">Spring</option>
+          <option value="summer">Summer</option>
+          <option value="fall">Fall</option>
+        </select>
+      </div>
+      <div class="form-group">
+        <label>Inquiry Date</label>
+        <input id="f-date" type="date"/>
+      </div>
+      <div class="form-group" id="status-group" style="display:none">
+        <label>Status</label>
+        <select id="f-status">
+          <option value="new">New</option>
+          <option value="contacted">Contacted</option>
+          <option value="touring">Touring</option>
+          <option value="enrolling">Enrolling</option>
+          <option value="enrolled">Enrolled</option>
+          <option value="lost">Lost</option>
+        </select>
+      </div>
+    </div>
+    <div class="form-row" style="margin-top:12px">
+      <div class="form-group">
+        <label>Notes</label>
+        <textarea id="f-notes" placeholder="Any notes about this inquiry..."></textarea>
+      </div>
+    </div>
+    <div class="btn-row">
+      <button class="btn-primary" onclick="saveProspect()">Save</button>
+      <button class="btn-cancel" id="btn-cancel" onclick="resetForm()" style="display:none">Cancel</button>
+    </div>
+  </div>
+
+  <!-- Filters -->
+  <div class="filter-bar">
+    <button class="filter-btn active" onclick="filterBy('all', this)">All</button>
+    <button class="filter-btn" onclick="filterBy('new', this)">New</button>
+    <button class="filter-btn" onclick="filterBy('contacted', this)">Contacted</button>
+    <button class="filter-btn" onclick="filterBy('touring', this)">Touring</button>
+    <button class="filter-btn" onclick="filterBy('enrolling', this)">Enrolling</button>
+    <button class="filter-btn" onclick="filterBy('enrolled', this)">Enrolled</button>
+    <button class="filter-btn" onclick="filterBy('lost', this)">Lost</button>
+  </div>
+
+  <!-- Table -->
+  <div class="card">
+    <h2>Prospect Log</h2>
+    <table>
+      <thead>
+        <tr>
+          <th>Name</th>
+          <th>Email</th>
+          <th>Phone</th>
+          <th>Center</th>
+          <th>Session</th>
+          <th>Date</th>
+          <th>Status</th>
+          <th>Student</th>
+          <th>Actions</th>
+        </tr>
+      </thead>
+      <tbody id="prospects-body">
+        <tr><td colspan="9" class="empty">Loading...</td></tr>
+      </tbody>
+    </table>
+  </div>
+</div>
+
+<!-- Log Modal -->
+<div class="modal-overlay" id="log-modal">
+  <div class="modal">
+    <button class="close-btn" onclick="closeLogModal()">&#x2715;</button>
+    <h3 id="log-modal-title">Activity Log</h3>
+
+    <!-- Add log entry -->
+    <div class="form-row">
+      <div class="form-group" style="max-width:180px">
+        <label>Action</label>
+        <select id="log-action">
+          <option value="called">Called</option>
+          <option value="emailed">Emailed</option>
+          <option value="toured">Toured</option>
+          <option value="voicemail">Left Voicemail</option>
+          <option value="note">Note</option>
+        </select>
+      </div>
+    </div>
+    <div class="form-row" style="margin-top:10px">
+      <div class="form-group">
+        <label>Note (optional)</label>
+        <textarea id="log-note" placeholder="Enter details, observations, or follow-up notes..." style="min-height:90px"></textarea>
+      </div>
+    </div>
+    <div class="btn-row" style="margin-bottom:20px">
+      <button class="btn-primary" onclick="addLogEntry()">Add Entry</button>
+    </div>
+
+    <!-- Log timeline -->
+    <div class="section-title">History</div>
+    <div id="log-timeline"></div>
+  </div>
+</div>
+
+<script>
+  let allProspects = [];
+  let editingId    = null;
+  let logProspectId = null;
+
+  const ACTION_ICONS = {
+    inquiry_received:     '📋',
+    status_changed:       '🔄',
+    converted_to_student: '🎓',
+    called:               '📞',
+    emailed:              '✉️',
+    toured:               '🏫',
+    voicemail:            '📱',
+    note:                 '📝',
+  };
+
+  async function loadCenters() {
+    const res = await fetch('/api/centers');
+    const centers = await res.json();
+    const sel = document.getElementById('f-center');
+    centers.forEach(c => {
+      const o = document.createElement('option');
+      o.value = c.id; o.textContent = c.name;
+      sel.appendChild(o);
+    });
+  }
+
+  async function loadProspects() {
+    const res = await fetch('/api/prospects');
+    allProspects = await res.json();
+    renderTable(allProspects);
+  }
+
+  function renderTable(data) {
+    const tbody = document.getElementById('prospects-body');
+    if (!data.length) {
+      tbody.innerHTML = '<tr><td colspan="9" class="empty">No prospects yet.</td></tr>';
+      return;
+    }
+    tbody.innerHTML = data.map(p => `
+      <tr>
+        <td>${p.first_name} ${p.last_name}</td>
+        <td>${p.email || '—'}</td>
+        <td>${p.phone || '—'}</td>
+        <td>${p.centers?.name || '—'}</td>
+        <td>${p.interested_session ? cap(p.interested_session) : '—'}</td>
+        <td>${p.inquiry_date ? p.inquiry_date.split('T')[0] : '—'}</td>
+        <td><span class="badge badge-${p.status}">${p.status}</span></td>
+        <td>${p.student_id ? '<a href="students.html">View</a>' : '—'}</td>
+        <td>
+          <button class="action-btn btn-edit" onclick="editProspect(${p.id})">Edit</button>
+          <button class="action-btn" style="background:#8e44ad;color:white" onclick="openLogModal(${p.id}, '${esc(p.first_name)} ${esc(p.last_name)}')">Log</button>
+          <button class="action-btn btn-delete" onclick="deleteProspect(${p.id})">Delete</button>
+        </td>
+      </tr>
+    `).join('');
+  }
+
+  function filterBy(status, btn) {
+    document.querySelectorAll('.filter-btn').forEach(b => b.classList.remove('active'));
+    btn.classList.add('active');
+    const filtered = status === 'all' ? allProspects : allProspects.filter(p => p.status === status);
+    renderTable(filtered);
+  }
+
+  async function saveProspect() {
+    const first_name = document.getElementById('f-first').value.trim();
+    const last_name  = document.getElementById('f-last').value.trim();
+    if (!first_name || !last_name) return showMsg('First and last name are required.', 'error');
+
+    const body = {
+      first_name, last_name,
+      email:              document.getElementById('f-email').value.trim(),
+      phone:              document.getElementById('f-phone').value.trim(),
+      center_id:          document.getElementById('f-center').value || null,
+      interested_session: document.getElementById('f-session').value || null,
+      inquiry_date:       document.getElementById('f-date').value || null,
+      notes:              document.getElementById('f-notes').value.trim(),
+      status:             document.getElementById('f-status').value || 'new',
+    };
+
+    if (editingId && body.status === 'enrolling') {
+      const current = allProspects.find(p => p.id === editingId);
+      if (current && !current.student_id) {
+        if (!confirm('Changing status to "Enrolling" will automatically create a student record. Continue?')) return;
+      }
+    }
+
+    const method = editingId ? 'PUT' : 'POST';
+    const url    = editingId ? `/api/prospects/${editingId}` : '/api/prospects';
+    const res = await fetch(url, {
+      method, headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body)
+    });
+
+    if (!res.ok) { const e = await res.json(); return showMsg(e.error, 'error'); }
+
+    const result = await res.json();
+    if (result.converted) {
+      showMsg(`Prospect updated and student record created (ID #${result.student_id}).`, 'success');
+    } else {
+      showMsg(editingId ? 'Prospect updated.' : 'Prospect logged.', 'success');
+    }
+
+    resetForm(); loadProspects();
+  }
+
+  async function editProspect(id) {
+    const res = await fetch(`/api/prospects/${id}`);
+    const p = await res.json();
+    editingId = id;
+    document.getElementById('f-first').value   = p.first_name || '';
+    document.getElementById('f-last').value    = p.last_name  || '';
+    document.getElementById('f-email').value   = p.email      || '';
+    document.getElementById('f-phone').value   = p.phone      || '';
+    document.getElementById('f-center').value  = p.center_id  || '';
+    document.getElementById('f-session').value = p.interested_session || '';
+    document.getElementById('f-date').value    = p.inquiry_date ? p.inquiry_date.split('T')[0] : '';
+    document.getElementById('f-notes').value   = p.notes      || '';
+    document.getElementById('f-status').value  = p.status     || 'new';
+    document.getElementById('form-title').textContent = 'Edit Prospect';
+    document.getElementById('status-group').style.display = 'flex';
+    document.getElementById('btn-cancel').style.display   = 'inline-block';
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+  }
+
+  async function deleteProspect(id) {
+    if (!confirm('Delete this prospect?')) return;
+    const res = await fetch(`/api/prospects/${id}`, { method: 'DELETE' });
+    if (!res.ok) return showMsg('Could not delete.', 'error');
+    showMsg('Prospect deleted.', 'success'); loadProspects();
+  }
+
+  function resetForm() {
+    editingId = null;
+    ['f-first','f-last','f-email','f-phone','f-notes'].forEach(id => document.getElementById(id).value = '');
+    document.getElementById('f-center').value  = '';
+    document.getElementById('f-session').value = '';
+    document.getElementById('f-date').value    = new Date().toISOString().split('T')[0];
+    document.getElementById('f-status').value  = 'new';
+    document.getElementById('form-title').textContent = 'Log New Inquiry';
+    document.getElementById('status-group').style.display = 'none';
+    document.getElementById('btn-cancel').style.display   = 'none';
+  }
+
+  // ---- LOG MODAL ----
+  async function openLogModal(prospectId, name) {
+    logProspectId = prospectId;
+    document.getElementById('log-modal-title').textContent = `Activity Log — ${name}`;
+    document.getElementById('log-modal').classList.add('open');
+    await refreshLogTimeline();
+  }
+
+  function closeLogModal() {
+    document.getElementById('log-modal').classList.remove('open');
+    document.getElementById('log-note').value = '';
+    logProspectId = null;
+  }
+
+  async function refreshLogTimeline() {
+    const res = await fetch(`/api/prospects/${logProspectId}/logs`);
+    const logs = await res.json();
+    const el = document.getElementById('log-timeline');
+
+    if (!logs.length) {
+      el.innerHTML = '<p style="color:#aaa;font-size:14px;padding:8px 0">No activity yet.</p>';
+      return;
+    }
+
+    el.innerHTML = logs.map(l => {
+      const icon  = ACTION_ICONS[l.action] || '•';
+      const label = l.action.replace(/_/g, ' ');
+      const statusChange = l.status_from && l.status_to
+        ? `<span style="color:#888;font-size:12px"> &nbsp;${cap(l.status_from)} → ${cap(l.status_to)}</span>`
+        : '';
+      return `
+        <div class="log-entry">
+          <div class="log-icon action-icon-${l.action}">${icon}</div>
+          <div class="log-body">
+            <div class="log-action">${label}${statusChange}</div>
+            ${l.note ? `<div class="log-note">${l.note}</div>` : ''}
+            <div class="log-time">${formatDate(l.created_at)}</div>
+          </div>
+          <button class="log-delete" title="Delete" onclick="deleteLogEntry(${l.id})">×</button>
+        </div>
+      `;
+    }).join('');
+  }
+
+  async function addLogEntry() {
+    const action = document.getElementById('log-action').value;
+    const note   = document.getElementById('log-note').value.trim();
+    const res = await fetch(`/api/prospects/${logProspectId}/logs`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ action, note: note || null })
+    });
+    if (!res.ok) { const e = await res.json(); return showMsg(e.error, 'error'); }
+    document.getElementById('log-note').value = '';
+    await refreshLogTimeline();
+  }
+
+  async function deleteLogEntry(logId) {
+    if (!confirm('Remove this log entry?')) return;
+    await fetch(`/api/prospects/${logProspectId}/logs/${logId}`, { method: 'DELETE' });
+    await refreshLogTimeline();
+  }
+
+  function formatDate(iso) {
+    const d = new Date(iso);
+    return d.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })
+      + ' ' + d.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' });
+  }
+
+  function showMsg(text, type) {
+    const el = document.getElementById('msg');
+    el.textContent = text; el.className = 'msg ' + type;
+    setTimeout(() => el.className = 'msg', 4000);
+  }
+
+  function cap(s) { return s ? s.charAt(0).toUpperCase() + s.slice(1) : ''; }
+  function esc(v) { return (v || '').replace(/'/g, "\\'"); }
+
+  document.getElementById('f-date').value = new Date().toISOString().split('T')[0];
+
+  loadCenters();
+  loadProspects();
+</script>
+</body>
+</html>

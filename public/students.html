@@ -1,0 +1,365 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>Students</title>
+  <link rel="stylesheet" href="style.css"/>
+  <style>
+    .modal-overlay {
+      display: none; position: fixed; inset: 0;
+      background: rgba(0,0,0,0.4); z-index: 100; align-items: center; justify-content: center;
+    }
+    .modal-overlay.open { display: flex; }
+    .modal {
+      background: white; border-radius: 10px; padding: 28px;
+      width: 100%; max-width: 520px; max-height: 90vh; overflow-y: auto;
+      box-shadow: 0 8px 32px rgba(0,0,0,0.18);
+    }
+    .modal h3 { margin-bottom: 18px; font-size: 16px; color: #333; }
+    .modal .close-btn { float: right; background: none; border: none; font-size: 20px; cursor: pointer; color: #999; padding: 0; }
+    .parents-list { margin-top: 12px; }
+    .parent-item {
+      display: flex; justify-content: space-between; align-items: center;
+      padding: 10px 12px; background: #f8f9fa; border-radius: 6px; margin-bottom: 8px;
+    }
+    .parent-item .info { font-size: 14px; }
+    .parent-item .rel  { font-size: 12px; color: #888; margin-top: 2px; text-transform: capitalize; }
+  </style>
+</head>
+<body>
+
+<nav>
+  <span class="brand">Daycare</span>
+  <a href="centers.html">Centers</a>
+  <a href="prospects.html">Prospects</a>
+  <a href="students.html" class="active">Students</a>
+</nav>
+
+<div class="container">
+  <div id="msg" class="msg"></div>
+
+  <!-- Form -->
+  <div class="card">
+    <h2 id="form-title">Add New Student</h2>
+    <div class="form-row">
+      <div class="form-group">
+        <label>First Name *</label>
+        <input id="f-first" type="text" placeholder="First name"/>
+      </div>
+      <div class="form-group">
+        <label>Last Name *</label>
+        <input id="f-last" type="text" placeholder="Last name"/>
+      </div>
+      <div class="form-group">
+        <label>Birthday</label>
+        <input id="f-birthday" type="date"/>
+      </div>
+      <div class="form-group" style="max-width:130px">
+        <label>Shirt Size</label>
+        <select id="f-shirt">
+          <option value="">—</option>
+          <option>XS</option><option>S</option><option>M</option>
+          <option>L</option><option>XL</option><option>XXL</option>
+        </select>
+      </div>
+    </div>
+    <div class="form-row" style="margin-top:12px">
+      <div class="form-group">
+        <label>Enrolled Date</label>
+        <input id="f-enrolled" type="date"/>
+      </div>
+      <div class="form-group">
+        <label>Status</label>
+        <select id="f-status">
+          <option value="prospect">Prospect</option>
+          <option value="touring">Touring</option>
+          <option value="enrolling">Enrolling</option>
+          <option value="waitlist">Waitlist</option>
+          <option value="active">Active</option>
+          <option value="on_hold">On Hold</option>
+          <option value="withdrawn">Withdrawn</option>
+          <option value="alumni">Alumni</option>
+        </select>
+      </div>
+    </div>
+    <div class="btn-row">
+      <button class="btn-primary" onclick="saveStudent()">Save</button>
+      <button class="btn-cancel" id="btn-cancel" onclick="resetForm()" style="display:none">Cancel</button>
+    </div>
+  </div>
+
+  <!-- Filters -->
+  <div class="filter-bar">
+    <button class="filter-btn active" onclick="filterBy('all', this)">All</button>
+    <button class="filter-btn" onclick="filterBy('prospect', this)">Prospect</button>
+    <button class="filter-btn" onclick="filterBy('touring', this)">Touring</button>
+    <button class="filter-btn" onclick="filterBy('enrolling', this)">Enrolling</button>
+    <button class="filter-btn" onclick="filterBy('waitlist', this)">Waitlist</button>
+    <button class="filter-btn" onclick="filterBy('active', this)">Active</button>
+    <button class="filter-btn" onclick="filterBy('on_hold', this)">On Hold</button>
+    <button class="filter-btn" onclick="filterBy('withdrawn', this)">Withdrawn</button>
+    <button class="filter-btn" onclick="filterBy('alumni', this)">Alumni</button>
+  </div>
+
+  <!-- Table -->
+  <div class="card">
+    <h2>Students</h2>
+    <table>
+      <thead>
+        <tr>
+          <th>Name</th>
+          <th>Birthday</th>
+          <th>Shirt</th>
+          <th>Enrolled</th>
+          <th>Status</th>
+          <th>Parents</th>
+          <th>Actions</th>
+        </tr>
+      </thead>
+      <tbody id="students-body">
+        <tr><td colspan="7" class="empty">Loading...</td></tr>
+      </tbody>
+    </table>
+  </div>
+</div>
+
+<!-- Parent Modal -->
+<div class="modal-overlay" id="parent-modal">
+  <div class="modal">
+    <button class="close-btn" onclick="closeParentModal()">&#x2715;</button>
+    <h3 id="modal-title">Parents / Guardians</h3>
+
+    <div id="parents-list" class="parents-list"></div>
+
+    <div class="section-title">Add Parent / Guardian</div>
+    <div class="form-row">
+      <div class="form-group">
+        <label>First Name *</label>
+        <input id="p-first" type="text" placeholder="First name"/>
+      </div>
+      <div class="form-group">
+        <label>Last Name *</label>
+        <input id="p-last" type="text" placeholder="Last name"/>
+      </div>
+    </div>
+    <div class="form-row" style="margin-top:10px">
+      <div class="form-group">
+        <label>Email</label>
+        <input id="p-email" type="email" placeholder="email@example.com"/>
+      </div>
+      <div class="form-group">
+        <label>Phone</label>
+        <input id="p-phone" type="text" placeholder="(555) 000-0000"/>
+      </div>
+      <div class="form-group" style="max-width:150px">
+        <label>Relationship</label>
+        <select id="p-rel">
+          <option value="mother">Mother</option>
+          <option value="father">Father</option>
+          <option value="guardian">Guardian</option>
+          <option value="other">Other</option>
+        </select>
+      </div>
+    </div>
+    <div class="btn-row">
+      <button class="btn-success" onclick="addParent()">Add Parent</button>
+    </div>
+  </div>
+</div>
+
+<script>
+  let allStudents = [];
+  let editingId = null;
+  let modalStudentId = null;
+
+  async function loadStudents() {
+    const res = await fetch('/api/students');
+    allStudents = await res.json();
+    renderTable(allStudents);
+  }
+
+  function renderTable(data) {
+    const tbody = document.getElementById('students-body');
+    if (!data.length) {
+      tbody.innerHTML = '<tr><td colspan="7" class="empty">No students yet.</td></tr>';
+      return;
+    }
+    tbody.innerHTML = data.map(s => {
+      const parents = (s.student_parents || [])
+        .map(sp => `${sp.parents.first_name} ${sp.parents.last_name}`)
+        .join(', ') || '—';
+      const age = s.birthday ? calcAge(s.birthday) : '—';
+      return `
+        <tr>
+          <td><strong>${s.last_name}</strong>, ${s.first_name}</td>
+          <td>${s.birthday ? s.birthday.split('T')[0] : '—'} ${age !== '—' ? `<span style="color:#aaa;font-size:12px">(${age}y)</span>` : ''}</td>
+          <td>${s.shirt_size || '—'}</td>
+          <td>${s.enrolled_date ? s.enrolled_date.split('T')[0] : '—'}</td>
+          <td><span class="badge badge-${s.status}">${s.status.replace('_',' ')}</span></td>
+          <td style="font-size:13px">${parents}</td>
+          <td>
+            <button class="action-btn btn-edit" onclick="editStudent(${s.id})">Edit</button>
+            <button class="action-btn" style="background:#8e44ad;color:white" onclick="openParentModal(${s.id}, '${esc(s.first_name)} ${esc(s.last_name)}')">Parents</button>
+            <button class="action-btn btn-delete" onclick="deleteStudent(${s.id})">Delete</button>
+          </td>
+        </tr>
+      `;
+    }).join('');
+  }
+
+  function filterBy(status, btn) {
+    document.querySelectorAll('.filter-btn').forEach(b => b.classList.remove('active'));
+    btn.classList.add('active');
+    const filtered = status === 'all' ? allStudents : allStudents.filter(s => s.status === status);
+    renderTable(filtered);
+  }
+
+  async function saveStudent() {
+    const first_name = document.getElementById('f-first').value.trim();
+    const last_name  = document.getElementById('f-last').value.trim();
+    if (!first_name || !last_name) return showMsg('First and last name are required.', 'error');
+
+    const body = {
+      first_name, last_name,
+      birthday:      document.getElementById('f-birthday').value || null,
+      shirt_size:    document.getElementById('f-shirt').value || null,
+      enrolled_date: document.getElementById('f-enrolled').value || null,
+      status:        document.getElementById('f-status').value,
+    };
+
+    const method = editingId ? 'PUT' : 'POST';
+    const url    = editingId ? `/api/students/${editingId}` : '/api/students';
+
+    const res = await fetch(url, {
+      method, headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body)
+    });
+
+    if (!res.ok) {
+      const err = await res.json();
+      return showMsg(err.error, 'error');
+    }
+
+    showMsg(editingId ? 'Student updated.' : 'Student added.', 'success');
+    resetForm();
+    loadStudents();
+  }
+
+  async function editStudent(id) {
+    const res = await fetch(`/api/students/${id}`);
+    const s = await res.json();
+    editingId = id;
+    document.getElementById('f-first').value    = s.first_name || '';
+    document.getElementById('f-last').value     = s.last_name  || '';
+    document.getElementById('f-birthday').value = s.birthday   ? s.birthday.split('T')[0] : '';
+    document.getElementById('f-shirt').value    = s.shirt_size || '';
+    document.getElementById('f-enrolled').value = s.enrolled_date ? s.enrolled_date.split('T')[0] : '';
+    document.getElementById('f-status').value   = s.status || 'prospect';
+    document.getElementById('form-title').textContent = `Edit: ${s.first_name} ${s.last_name}`;
+    document.getElementById('btn-cancel').style.display = 'inline-block';
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+  }
+
+  async function deleteStudent(id) {
+    if (!confirm('Delete this student? This cannot be undone.')) return;
+    const res = await fetch(`/api/students/${id}`, { method: 'DELETE' });
+    if (!res.ok) return showMsg('Could not delete student.', 'error');
+    showMsg('Student deleted.', 'success');
+    loadStudents();
+  }
+
+  function resetForm() {
+    editingId = null;
+    ['f-first','f-last','f-birthday','f-enrolled'].forEach(id => document.getElementById(id).value = '');
+    document.getElementById('f-shirt').value  = '';
+    document.getElementById('f-status').value = 'prospect';
+    document.getElementById('form-title').textContent = 'Add New Student';
+    document.getElementById('btn-cancel').style.display = 'none';
+  }
+
+  // ---- PARENT MODAL ----
+  async function openParentModal(studentId, name) {
+    modalStudentId = studentId;
+    document.getElementById('modal-title').textContent = `Parents — ${name}`;
+    document.getElementById('parent-modal').classList.add('open');
+    await refreshParentList(studentId);
+  }
+
+  function closeParentModal() {
+    document.getElementById('parent-modal').classList.remove('open');
+    ['p-first','p-last','p-email','p-phone'].forEach(id => document.getElementById(id).value = '');
+    document.getElementById('p-rel').value = 'mother';
+    modalStudentId = null;
+    loadStudents();
+  }
+
+  async function refreshParentList(studentId) {
+    const res = await fetch(`/api/students/${studentId}`);
+    const s = await res.json();
+    const list = document.getElementById('parents-list');
+    const links = s.student_parents || [];
+    if (!links.length) {
+      list.innerHTML = '<p style="color:#aaa;font-size:14px">No parents linked yet.</p>';
+      return;
+    }
+    list.innerHTML = links.map(sp => `
+      <div class="parent-item">
+        <div>
+          <div class="info"><strong>${sp.parents.first_name} ${sp.parents.last_name}</strong></div>
+          <div class="rel">${sp.relationship || ''} &nbsp;·&nbsp; ${sp.parents.email || '—'} &nbsp;·&nbsp; ${sp.parents.phone || '—'}</div>
+        </div>
+        <button class="action-btn btn-delete" onclick="unlinkParent(${studentId}, ${sp.id})">Remove</button>
+      </div>
+    `).join('');
+  }
+
+  async function addParent() {
+    const first_name   = document.getElementById('p-first').value.trim();
+    const last_name    = document.getElementById('p-last').value.trim();
+    if (!first_name || !last_name) return showMsg('Parent name is required.', 'error');
+
+    const res = await fetch(`/api/students/${modalStudentId}/parents`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        first_name, last_name,
+        email:        document.getElementById('p-email').value.trim(),
+        phone:        document.getElementById('p-phone').value.trim(),
+        relationship: document.getElementById('p-rel').value,
+      })
+    });
+
+    if (!res.ok) {
+      const err = await res.json();
+      return showMsg(err.error, 'error');
+    }
+
+    ['p-first','p-last','p-email','p-phone'].forEach(id => document.getElementById(id).value = '');
+    await refreshParentList(modalStudentId);
+  }
+
+  async function unlinkParent(studentId, linkId) {
+    if (!confirm('Remove this parent link?')) return;
+    await fetch(`/api/students/${studentId}/parents/${linkId}`, { method: 'DELETE' });
+    await refreshParentList(studentId);
+  }
+
+  function calcAge(birthday) {
+    const d = new Date(birthday), now = new Date();
+    let age = now.getFullYear() - d.getFullYear();
+    if (now < new Date(now.getFullYear(), d.getMonth(), d.getDate())) age--;
+    return age;
+  }
+
+  function showMsg(text, type) {
+    const el = document.getElementById('msg');
+    el.textContent = text; el.className = 'msg ' + type;
+    setTimeout(() => el.className = 'msg', 4000);
+  }
+
+  function esc(val) { return (val || '').replace(/'/g, "\\'"); }
+
+  loadStudents();
+</script>
+</body>
+</html>

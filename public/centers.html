@@ -1,0 +1,133 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>Centers</title>
+  <link rel="stylesheet" href="style.css"/>
+</head>
+<body>
+
+<nav>
+  <span class="brand">Daycare</span>
+  <a href="centers.html" class="active">Centers</a>
+  <a href="prospects.html">Prospects</a>
+  <a href="students.html">Students</a>
+</nav>
+
+<div class="container">
+  <div id="msg" class="msg"></div>
+
+  <div class="card">
+    <h2 id="form-title">Add New Center</h2>
+    <div class="form-row">
+      <div class="form-group">
+        <label>Center Name *</label>
+        <input id="f-name" type="text" placeholder="e.g. Sunny Kids Center"/>
+      </div>
+      <div class="form-group">
+        <label>Address</label>
+        <input id="f-address" type="text" placeholder="123 Main St, Town, ST"/>
+      </div>
+      <div class="form-group" style="max-width:200px">
+        <label>Phone</label>
+        <input id="f-phone" type="text" placeholder="(555) 000-0000"/>
+      </div>
+    </div>
+    <div class="btn-row">
+      <button class="btn-primary" onclick="saveCenter()">Save</button>
+      <button class="btn-cancel" id="btn-cancel" onclick="resetForm()" style="display:none">Cancel</button>
+    </div>
+  </div>
+
+  <div class="card">
+    <h2>All Centers</h2>
+    <table>
+      <thead>
+        <tr><th>#</th><th>Name</th><th>Address</th><th>Phone</th><th>Actions</th></tr>
+      </thead>
+      <tbody id="centers-body">
+        <tr><td colspan="5" class="empty">Loading...</td></tr>
+      </tbody>
+    </table>
+  </div>
+</div>
+
+<script>
+  let editingId = null;
+
+  async function loadCenters() {
+    const res = await fetch('/api/centers');
+    const data = await res.json();
+    const tbody = document.getElementById('centers-body');
+    if (!data.length) {
+      tbody.innerHTML = '<tr><td colspan="5" class="empty">No centers yet. Add one above.</td></tr>';
+      return;
+    }
+    tbody.innerHTML = data.map(c => `
+      <tr>
+        <td>${c.id}</td>
+        <td>${c.name}</td>
+        <td>${c.address || '—'}</td>
+        <td>${c.phone   || '—'}</td>
+        <td>
+          <button class="action-btn btn-edit" onclick="editCenter(${c.id})">Edit</button>
+          <button class="action-btn btn-delete" onclick="deleteCenter(${c.id})">Delete</button>
+        </td>
+      </tr>
+    `).join('');
+  }
+
+  async function saveCenter() {
+    const name    = document.getElementById('f-name').value.trim();
+    const address = document.getElementById('f-address').value.trim();
+    const phone   = document.getElementById('f-phone').value.trim();
+    if (!name) return showMsg('Center name is required.', 'error');
+
+    const method = editingId ? 'PUT' : 'POST';
+    const url    = editingId ? `/api/centers/${editingId}` : '/api/centers';
+    const res = await fetch(url, {
+      method, headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ name, address, phone })
+    });
+    if (!res.ok) { const e = await res.json(); return showMsg(e.error, 'error'); }
+    showMsg(editingId ? 'Center updated.' : 'Center added.', 'success');
+    resetForm(); loadCenters();
+  }
+
+  async function editCenter(id) {
+    const res = await fetch(`/api/centers/${id}`);
+    const c = await res.json();
+    editingId = id;
+    document.getElementById('f-name').value    = c.name    || '';
+    document.getElementById('f-address').value = c.address || '';
+    document.getElementById('f-phone').value   = c.phone   || '';
+    document.getElementById('form-title').textContent = 'Edit Center';
+    document.getElementById('btn-cancel').style.display = 'inline-block';
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+  }
+
+  async function deleteCenter(id) {
+    if (!confirm('Delete this center?')) return;
+    const res = await fetch(`/api/centers/${id}`, { method: 'DELETE' });
+    if (!res.ok) return showMsg('Could not delete center.', 'error');
+    showMsg('Center deleted.', 'success'); loadCenters();
+  }
+
+  function resetForm() {
+    editingId = null;
+    ['f-name','f-address','f-phone'].forEach(id => document.getElementById(id).value = '');
+    document.getElementById('form-title').textContent = 'Add New Center';
+    document.getElementById('btn-cancel').style.display = 'none';
+  }
+
+  function showMsg(text, type) {
+    const el = document.getElementById('msg');
+    el.textContent = text; el.className = 'msg ' + type;
+    setTimeout(() => el.className = 'msg', 3000);
+  }
+
+  loadCenters();
+</script>
+</body>
+</html>
