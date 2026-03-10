@@ -157,20 +157,61 @@
       const data = await res.json();
       if (!res.ok) return showMsg(data.error, 'error');
 
-      allDates   = data.dates;
-      allGroups  = data.groups;
-      grandTotal = data.grandTotal;
-
-      // Set default date range
-      if (allDates.length) {
-        document.getElementById('start-date').value = allDates[0].date;
-        document.getElementById('end-date').value   = allDates[allDates.length - 1].date;
+      if (data.type === 'weekly') {
+        // School year: Mon–Fri aggregate, no date filter
+        document.querySelector('.date-filter').style.display = 'none';
+        renderWeeklyTable(data);
+      } else {
+        // Summer camp: dated columns with date range filter
+        allDates   = data.dates;
+        allGroups  = data.groups;
+        grandTotal = data.grandTotal;
+        if (allDates.length) {
+          document.getElementById('start-date').value = allDates[0].date;
+          document.getElementById('end-date').value   = allDates[allDates.length - 1].date;
+        }
+        renderTable(allDates, allGroups, grandTotal);
       }
-
-      renderTable(allDates, allGroups, grandTotal);
     } catch(err) {
       showMsg('Failed to load dashboard: ' + err.message, 'error');
     }
+  }
+
+  function renderWeeklyTable(data) {
+    const { days, dayTotals, groups, grandTotal } = data;
+    const peak = Math.max(...dayTotals);
+
+    document.getElementById('stat-total').textContent  = grandTotal || '—';
+    document.getElementById('stat-groups').textContent = groups.length;
+    document.getElementById('stat-weeks').textContent  = '—';
+    document.getElementById('stat-peak').textContent   = peak;
+
+    const DAY_CLASSES = { Mon: 'day-M', Tue: 'day-Tu', Weds: 'day-W', Thur: 'day-Th', Fri: 'day-F' };
+
+    document.getElementById('table-head').innerHTML = `
+      <tr>
+        <th style="text-align:left">Group</th>
+        ${days.map(d => `<th class="${DAY_CLASSES[d] || ''}">${d}</th>`).join('')}
+      </tr>
+    `;
+
+    const groupRows = groups.map(g => `
+      <tr>
+        <td class="group-name">${g.name}</td>
+        ${g.daily.map((v, i) => `
+          <td class="${DAY_CLASSES[days[i]] || ''} ${v === 0 ? 'zero' : ''}">${v === 0 ? '·' : v}</td>
+        `).join('')}
+      </tr>
+    `).join('');
+
+    const totalRow = `
+      <tr class="total-row">
+        <td class="group-name">DAILY TOTAL</td>
+        ${dayTotals.map((v, i) => `<td class="${DAY_CLASSES[days[i]] || ''}">${v}</td>`).join('')}
+      </tr>
+    `;
+
+    document.getElementById('table-body').innerHTML = groupRows + totalRow;
   }
 
   function applyFilter() {
@@ -187,7 +228,6 @@
       return;
     }
 
-    // Recalculate group daily arrays for filtered dates
     const filteredGroups = allGroups.map(g => {
       const indexMap = filtered.map(fd => allDates.findIndex(d => d.date === fd.date));
       return { name: g.name, unique: g.unique, daily: indexMap.map(i => g.daily[i] || 0) };
@@ -213,19 +253,16 @@
   function renderTable(dates, groups, total) {
     updateStats(dates, groups, total);
 
-    // Week break detection
     const weekBreaks = new Set();
     let lastWeek = null;
     dates.forEach((d, i) => {
       if (d.week !== lastWeek) { weekBreaks.add(i); lastWeek = d.week; }
     });
 
-    // Week span entries
     const weekCols = {};
     dates.forEach(d => { weekCols[d.week] = (weekCols[d.week] || 0) + 1; });
     const weekEntries = [...new Set(dates.map(d => d.week))].map(w => ({ week: w, span: weekCols[w] }));
 
-    // Header: 2 rows — Week | Day+Date
     document.getElementById('table-head').innerHTML = `
       <tr>
         <th rowspan="2" style="text-align:left">Group</th>
@@ -242,7 +279,6 @@
       </tr>
     `;
 
-    // Body rows
     const groupRows = groups.map(g => `
       <tr>
         <td class="group-name">${g.name}</td>

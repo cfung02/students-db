@@ -52,44 +52,24 @@ function parseCampDashboard(wb) {
 }
 
 function parseRRDashboard(wb) {
-  const ws   = wb.Sheets['Daily Count by Group'];
+  const ws   = wb.Sheets['Daily Student Counts'];
   const rows = XLSX.utils.sheet_to_json(ws, { header: 1 });
-  // Row 1: week labels (merged cells — propagate forward)
-  const weekLabelRow = rows[1] || [];
-  const weekMap = {};
-  let currentWeek = null;
-  for (let i = 2; i < weekLabelRow.length; i++) {
-    const cell = weekLabelRow[i];
-    if (cell && typeof cell === 'string' && cell.startsWith('Week ')) {
-      currentWeek = parseInt(cell.replace('Week ', ''));
-    }
-    if (currentWeek !== null) weekMap[i] = currentWeek;
-  }
-  // Row 2: dates
-  const dateRow = rows[2] || [];
-  const dates = [];
-  for (let i = 2; i < dateRow.length; i++) {
-    if (!dateRow[i] || weekMap[i] === undefined) continue;
-    const dateStr = parseRRDate(dateRow[i]);
-    if (!dateStr) continue;
-    dates.push({ index: i, date: dateStr, week: weekMap[i] });
-  }
-  const activeDates = dates.filter(d => d.week <= 8);
-  // Grand total row (row 20)
-  const totalRow = rows[20] || [];
-  activeDates.forEach(d => { d.total = totalRow[d.index] || 0; });
-  const grandTotal = totalRow[1] || 0;
-  // Groups: rows 4-19, skip travel groups
-  const skipGroups = new Set(['TRAV B', 'TRAV G']);
+  // Row 0: ["Group","Mon","Tue","Weds","Thur","Fri"]
+  // Rows 1–5: group data
+  // Row 6: Grand Total
+  const dayNames  = (rows[0] || []).slice(1).map(d => String(d).trim());
+  const totalRow  = rows[6] || [];
+  const dayTotals = dayNames.map((_, i) => totalRow[i + 1] || 0);
   const groups = [];
-  for (let r = 4; r <= 19; r++) {
+  for (let r = 1; r <= 5; r++) {
     const row = rows[r];
-    if (!row || !row[0]) continue;
-    const name = String(row[0]).trim();
-    if (skipGroups.has(name)) continue;
-    groups.push({ name, unique: row[1] || 0, daily: activeDates.map(d => row[d.index] || 0) });
+    if (!row || !row[0] || String(row[0]).toLowerCase().includes('total')) continue;
+    groups.push({
+      name:  String(row[0]).trim(),
+      daily: dayNames.map((_, i) => row[i + 1] || 0),
+    });
   }
-  return { dates: activeDates.map(({ date, week, total }) => ({ date, week, total })), groups, grandTotal };
+  return { type: 'weekly', days: dayNames, dayTotals, groups };
 }
 
 // GET /api/centers/:id/dashboard
