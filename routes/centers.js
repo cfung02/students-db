@@ -54,21 +54,24 @@ function parseCampDashboard(wb) {
 function parseRRDashboard(wb) {
   const ws   = wb.Sheets['Daily Student Counts'];
   const rows = XLSX.utils.sheet_to_json(ws, { header: 1 });
-  // Row 0: ["Group","Mon","Tue","Weds","Thur","Fri"]
-  // Rows 1–5: group data
-  // Row 6: Grand Total
-  const dayNames  = (rows[0] || []).slice(1).map(d => String(d).trim());
-  const totalRow  = rows[6] || [];
-  const dayTotals = dayNames.map((_, i) => totalRow[i + 1] || 0);
-  const groups = [];
-  for (let r = 1; r <= 5; r++) {
-    const row = rows[r];
-    if (!row || !row[0] || String(row[0]).toLowerCase().includes('total')) continue;
+  // Row 0: header ["Group","Mon","Tue","Weds","Thur","Fri"]
+  // Remaining rows: group data until blank or Grand Total
+  const dayNames = (rows[0] || []).slice(1).map(d => String(d).trim()).filter(Boolean);
+  const groups   = [];
+  let   totalRow = [];
+
+  for (let r = 1; r < rows.length; r++) {
+    const row  = rows[r];
+    if (!row || !row[0]) break;
+    const name = String(row[0]).trim();
+    if (name.toLowerCase().includes('total')) { totalRow = row; break; }
     groups.push({
-      name:  String(row[0]).trim(),
+      name,
       daily: dayNames.map((_, i) => row[i + 1] || 0),
     });
   }
+
+  const dayTotals = dayNames.map((_, i) => totalRow[i + 1] || 0);
   return { type: 'weekly', days: dayNames, dayTotals, groups };
 }
 
