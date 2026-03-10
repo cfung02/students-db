@@ -19,6 +19,32 @@
     .modal h3 { margin-bottom: 18px; font-size: 16px; color: #333; }
     .modal .close-btn { float: right; background: none; border: none; font-size: 20px; cursor: pointer; color: #999; padding: 0; }
 
+    .followup-btn {
+      position: fixed; bottom: 28px; right: 28px;
+      background: #27ae60; color: white; border: none; border-radius: 50px;
+      padding: 12px 22px; font-size: 15px; font-weight: bold; cursor: pointer;
+      box-shadow: 0 4px 16px rgba(0,0,0,0.2); z-index: 50;
+      display: flex; align-items: center; gap: 8px;
+    }
+    .followup-btn:hover { background: #219a52; }
+    .followup-badge {
+      background: #e74c3c; color: white; border-radius: 50%;
+      width: 22px; height: 22px; font-size: 12px;
+      display: flex; align-items: center; justify-content: center;
+    }
+    .followup-modal { max-width: 680px; }
+    .followup-item {
+      display: flex; align-items: center; justify-content: space-between;
+      padding: 12px 0; border-bottom: 1px solid #f0f0f0; gap: 12px;
+    }
+    .followup-item:last-child { border-bottom: none; }
+    .followup-info { flex: 1; }
+    .followup-name { font-size: 14px; font-weight: bold; color: #333; }
+    .followup-meta { font-size: 12px; color: #888; margin-top: 3px; }
+    .followup-actions { display: flex; gap: 6px; flex-shrink: 0; }
+    .btn-email { background: #2980b9; color: white; padding: 5px 12px; font-size: 12px; border-radius: 4px; text-decoration: none; font-weight: bold; }
+    .btn-email:hover { background: #2471a3; }
+
     .log-entry {
       display: flex; gap: 12px; padding: 10px 0; border-bottom: 1px solid #f0f0f0;
     }
@@ -154,6 +180,55 @@
   </div>
 </div>
 
+<!-- Follow-up Floating Button -->
+<button class="followup-btn" onclick="openFollowupModal()">
+  Follow-up <span class="followup-badge" id="followup-count">0</span>
+</button>
+
+<!-- Follow-up Modal -->
+<div class="modal-overlay" id="followup-modal">
+  <div class="modal followup-modal">
+    <button class="close-btn" onclick="closeFollowupModal()">&#x2715;</button>
+    <h3>Prospects to Follow Up</h3>
+    <p style="font-size:13px;color:#888;margin-bottom:16px">Prospects with status: New, Contacted, or Touring.</p>
+    <div id="followup-list"></div>
+  </div>
+</div>
+
+<!-- Email Compose Modal -->
+<div class="modal-overlay" id="email-modal">
+  <div class="modal" style="max-width:620px">
+    <button class="close-btn" onclick="closeEmailModal()">&#x2715;</button>
+    <h3 id="email-modal-title">✉️ Compose Email</h3>
+
+    <!-- Template switcher -->
+    <div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:16px">
+      <button class="filter-btn" id="tpl-btn-followup1" onclick="switchTemplate('followup1')">1st Follow-up</button>
+      <button class="filter-btn" id="tpl-btn-followup2" onclick="switchTemplate('followup2')">2nd Follow-up</button>
+      <button class="filter-btn" id="tpl-btn-called"    onclick="switchTemplate('called')">After Call</button>
+      <button class="filter-btn" id="tpl-btn-toured"    onclick="switchTemplate('toured')">After Tour</button>
+    </div>
+
+    <div class="form-group" style="margin-bottom:12px">
+      <label>To</label>
+      <input id="email-to" type="email" placeholder="recipient@email.com"/>
+    </div>
+    <div class="form-group" style="margin-bottom:12px">
+      <label>Subject</label>
+      <input id="email-subject" type="text"/>
+    </div>
+    <div class="form-group" style="margin-bottom:16px">
+      <label>Message</label>
+      <textarea id="email-body" style="min-height:240px"></textarea>
+    </div>
+    <div id="email-msg" class="msg"></div>
+    <div class="btn-row">
+      <button class="btn-success" onclick="sendEmail()">Send Email</button>
+      <button class="btn-cancel"  onclick="closeEmailModal()">Cancel</button>
+    </div>
+  </div>
+</div>
+
 <!-- Log Modal -->
 <div class="modal-overlay" id="log-modal">
   <div class="modal">
@@ -185,14 +260,25 @@
 
     <!-- Log timeline -->
     <div class="section-title">History</div>
+    <div style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:12px">
+      <button class="filter-btn active" onclick="filterLog('all', this)">All</button>
+      <button class="filter-btn" onclick="filterLog('called', this)">📞 Called</button>
+      <button class="filter-btn" onclick="filterLog('emailed', this)">✉️ Emailed</button>
+      <button class="filter-btn" onclick="filterLog('toured', this)">🏫 Toured</button>
+      <button class="filter-btn" onclick="filterLog('voicemail', this)">📱 Voicemail</button>
+      <button class="filter-btn" onclick="filterLog('note', this)">📝 Note</button>
+      <button class="filter-btn" onclick="filterLog('status_changed', this)">🔄 Status</button>
+    </div>
     <div id="log-timeline"></div>
   </div>
 </div>
 
 <script>
   let allProspects = [];
-  let editingId    = null;
+  let editingId     = null;
   let logProspectId = null;
+  let allLogs       = [];
+  let activeLogFilter = 'all';
 
   const ACTION_ICONS = {
     inquiry_received:     '📋',
@@ -220,6 +306,7 @@
     const res = await fetch('/api/prospects');
     allProspects = await res.json();
     renderTable(allProspects);
+    updateFollowupCount();
   }
 
   function renderTable(data) {
@@ -345,15 +432,32 @@
     document.getElementById('log-modal').classList.remove('open');
     document.getElementById('log-note').value = '';
     logProspectId = null;
+    activeLogFilter = 'all';
+    document.querySelectorAll('#log-modal .filter-btn').forEach((b, i) => {
+      b.classList.toggle('active', i === 0);
+    });
+  }
+
+  function filterLog(type, btn) {
+    activeLogFilter = type;
+    document.querySelectorAll('#log-modal .filter-btn').forEach(b => b.classList.remove('active'));
+    btn.classList.add('active');
+    const filtered = type === 'all' ? allLogs : allLogs.filter(l => l.action === type);
+    renderLogTimeline(filtered);
   }
 
   async function refreshLogTimeline() {
     const res = await fetch(`/api/prospects/${logProspectId}/logs`);
-    const logs = await res.json();
+    allLogs = await res.json();
+    const filtered = activeLogFilter === 'all' ? allLogs : allLogs.filter(l => l.action === activeLogFilter);
+    renderLogTimeline(filtered);
+  }
+
+  function renderLogTimeline(logs) {
     const el = document.getElementById('log-timeline');
 
     if (!logs.length) {
-      el.innerHTML = '<p style="color:#aaa;font-size:14px;padding:8px 0">No activity yet.</p>';
+      el.innerHTML = '<p style="color:#aaa;font-size:14px;padding:8px 0">No entries for this filter.</p>';
       return;
     }
 
@@ -408,8 +512,212 @@
     setTimeout(() => el.className = 'msg', 4000);
   }
 
+  // ---- FOLLOW-UP MODAL ----
+  function updateFollowupCount() {
+    const followups = allProspects.filter(p => ['new','contacted','touring'].includes(p.status));
+    document.getElementById('followup-count').textContent = followups.length;
+  }
+
+  function openFollowupModal() {
+    const followups = allProspects
+      .filter(p => ['new','contacted','touring'].includes(p.status))
+      .sort((a, b) => new Date(a.inquiry_date) - new Date(b.inquiry_date));
+
+    const list = document.getElementById('followup-list');
+    if (!followups.length) {
+      list.innerHTML = '<p style="color:#aaa;text-align:center;padding:24px">No prospects need follow-up right now.</p>';
+    } else {
+      list.innerHTML = followups.map(p => {
+        const daysSince = p.inquiry_date
+          ? Math.floor((new Date() - new Date(p.inquiry_date)) / 86400000)
+          : '—';
+        return `
+          <div class="followup-item">
+            <div class="followup-info">
+              <div class="followup-name">${p.first_name} ${p.last_name}</div>
+              <div class="followup-meta">
+                <span class="badge badge-${p.status}">${p.status}</span>
+                &nbsp;·&nbsp; ${p.email || 'No email'} &nbsp;·&nbsp; ${p.phone || 'No phone'}
+                &nbsp;·&nbsp; Inquired ${daysSince} day${daysSince !== 1 ? 's' : ''} ago
+                ${p.interested_session ? `&nbsp;·&nbsp; ${cap(p.interested_session)}` : ''}
+              </div>
+            </div>
+            <div class="followup-actions">
+              ${p.email
+                ? `<button class="btn-email" onclick="openEmailModal('${esc(p.email)}', '${esc(p.first_name)}', '${esc(p.last_name)}', '${p.interested_session || ''}', ${p.id})">✉️ Email</button>`
+                : `<span style="font-size:12px;color:#ccc">No email</span>`
+              }
+              <button class="action-btn btn-edit" onclick="closeFollowupModal(); editProspect(${p.id})">Edit</button>
+              <button class="action-btn" style="background:#8e44ad;color:white" onclick="closeFollowupModal(); openLogModal(${p.id}, '${esc(p.first_name)} ${esc(p.last_name)}')">Log</button>
+            </div>
+          </div>
+        `;
+      }).join('');
+    }
+    document.getElementById('followup-modal').classList.add('open');
+  }
+
+  function closeFollowupModal() {
+    document.getElementById('followup-modal').classList.remove('open');
+  }
+
   function cap(s) { return s ? s.charAt(0).toUpperCase() + s.slice(1) : ''; }
   function esc(v) { return (v || '').replace(/'/g, "\\'"); }
+
+  // ---- EMAIL MODAL ----
+  let emailProspectId   = null;
+  let emailFirstName    = '';
+  let emailLastName     = '';
+  let emailSession      = '';
+  let currentFollowUpNum  = 1;
+  let currentTemplateKey  = 'followup1';
+
+  const TEMPLATES = {
+    followup1: (firstName, session) => ({
+      label: '1st Follow-up',
+      subject: `Following up on your inquiry`,
+      body:
+`Hi ${firstName},
+
+Thank you for reaching out to us! We wanted to follow up on your recent inquiry${session ? ` regarding our ${cap(session)} program` : ''}.
+
+We would love to schedule a time for you to visit our center and see firsthand what makes our program special. Our team is dedicated to creating a safe, fun, and enriching environment for every child.
+
+Please don't hesitate to reply to this email or give us a call — we are happy to answer any questions you may have.
+
+We look forward to hearing from you!
+
+Warm regards,
+The Daycare Team`
+    }),
+    followup2: (firstName, session) => ({
+      label: '2nd Follow-up',
+      subject: `We'd still love to welcome you!`,
+      body:
+`Hi ${firstName},
+
+We noticed we haven't heard back from you yet and wanted to reach out one more time. We truly believe our program would be a wonderful fit for your family${session ? ` — especially our ${cap(session)} session` : ''}.
+
+We understand how busy life can get, so we want to make this as easy as possible for you. Whether you have questions, want to schedule a quick tour, or just want to chat — we are here for you.
+
+Spots are filling up, so we encourage you to reach out soon. We would hate for you to miss out!
+
+Please reply to this email or call us at your convenience. We hope to welcome your child to our family soon.
+
+Warm regards,
+The Daycare Team`
+    }),
+    called: (firstName, session) => ({
+      label: 'After Call',
+      subject: `Great speaking with you!`,
+      body:
+`Hi ${firstName},
+
+It was wonderful speaking with you today! Thank you for taking the time to chat with us about your child's care.
+
+As discussed, we wanted to follow up in writing${session ? ` regarding our upcoming ${cap(session)} program` : ''}. We hope our conversation gave you a better sense of what we offer and the warm, supportive environment we provide for every child in our care.
+
+If you have any additional questions or would like to move forward, please don't hesitate to reach out. We are just a call or email away!
+
+We look forward to hopefully welcoming your child to our family.
+
+Warm regards,
+The Daycare Team`
+    }),
+    toured: (firstName, session) => ({
+      label: 'After Tour',
+      subject: `Thank you for visiting us!`,
+      body:
+`Hi ${firstName},
+
+Thank you so much for coming in to tour our facility! It was such a pleasure meeting you and we hope you left feeling excited about what we have to offer.
+
+We truly believe our program provides the ideal environment for children to learn, grow, and thrive${session ? ` — and we think our ${cap(session)} session would be a perfect fit for your family` : ''}.
+
+We would love to have your child join our community. If you are ready to take the next step or still have questions, please reach out — we are happy to walk you through the enrollment process.
+
+We hope to see you again soon!
+
+Warm regards,
+The Daycare Team`
+    }),
+  };
+
+  async function openEmailModal(email, firstName, lastName, session, prospectId) {
+    emailProspectId = prospectId || null;
+    emailFirstName  = firstName;
+    emailLastName   = lastName;
+    emailSession    = session;
+
+    // Auto-detect best template from log history
+    let defaultTpl = 'followup1';
+    if (prospectId) {
+      const res  = await fetch(`/api/prospects/${prospectId}/logs`);
+      const logs = await res.json();
+      const lastAction = logs.find(l => ['called','toured','emailed'].includes(l.action));
+      if (lastAction?.action === 'toured') defaultTpl = 'toured';
+      else if (lastAction?.action === 'called') defaultTpl = 'called';
+      else {
+        const emailsSent = logs.filter(l => l.action === 'emailed').length;
+        defaultTpl = emailsSent >= 1 ? 'followup2' : 'followup1';
+      }
+    }
+
+    document.getElementById('email-to').value      = email;
+    document.getElementById('email-msg').className = 'msg';
+    document.getElementById('email-modal-title').textContent = `✉️ Email — ${firstName} ${lastName}`;
+    document.getElementById('email-modal').classList.add('open');
+    switchTemplate(defaultTpl);
+  }
+
+  function switchTemplate(key) {
+    currentTemplateKey = key;
+    currentFollowUpNum = key.startsWith('followup') ? parseInt(key.slice(-1)) : 1;
+    const tpl = TEMPLATES[key](emailFirstName, emailSession);
+    document.getElementById('email-subject').value = tpl.subject;
+    document.getElementById('email-body').value    = tpl.body;
+    Object.keys(TEMPLATES).forEach(k => {
+      document.getElementById(`tpl-btn-${k}`).classList.toggle('active', k === key);
+    });
+  }
+
+  function closeEmailModal() {
+    document.getElementById('email-modal').classList.remove('open');
+    emailProspectId = null;
+  }
+
+  async function sendEmail() {
+    const to      = document.getElementById('email-to').value.trim();
+    const subject = document.getElementById('email-subject').value.trim();
+    const body    = document.getElementById('email-body').value.trim();
+    if (!to || !subject || !body) return showEmailMsg('All fields are required.', 'error');
+
+    const btn = event.target;
+    btn.textContent = 'Sending...';
+    btn.disabled = true;
+
+    const res = await fetch('/api/email/send', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ to, subject, body, prospect_id: emailProspectId, follow_up_number: currentTemplateKey })
+    });
+
+    btn.textContent = 'Send Email';
+    btn.disabled = false;
+
+    if (!res.ok) {
+      const err = await res.json();
+      return showEmailMsg(err.error, 'error');
+    }
+
+    showEmailMsg('Email sent and logged successfully!', 'success');
+    setTimeout(() => { closeEmailModal(); loadProspects(); }, 2000);
+  }
+
+  function showEmailMsg(text, type) {
+    const el = document.getElementById('email-msg');
+    el.textContent = text; el.className = 'msg ' + type;
+  }
 
   document.getElementById('f-date').value = new Date().toISOString().split('T')[0];
 

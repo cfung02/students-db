@@ -73,6 +73,8 @@
         <td>
           <button class="action-btn btn-edit" onclick="editCenter(${c.id})">Edit</button>
           <button class="action-btn btn-delete" onclick="deleteCenter(${c.id})">Delete</button>
+          <a class="action-btn" style="background:#7d3c0f;color:white;text-decoration:none;padding:4px 11px;border-radius:4px;font-size:12px;display:inline-block"
+             href="school-dashboard.html?center_id=${c.id}&name=${encodeURIComponent(c.name)}">School Dashboard</a>
         </td>
       </tr>
     `).join('');

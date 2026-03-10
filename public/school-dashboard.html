@@ -1,0 +1,186 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>School Dashboard</title>
+  <link rel="stylesheet" href="style.css"/>
+  <style>
+    .dashboard-header {
+      display: flex; align-items: center; gap: 16px; margin-bottom: 20px; flex-wrap: wrap;
+    }
+    .dashboard-header h1 {
+      font-size: 20px; color: #7d3c0f; flex: 1;
+    }
+    .stat-bar {
+      display: flex; gap: 12px; flex-wrap: wrap; margin-bottom: 24px;
+    }
+    .stat-card {
+      background: #fffaf5; border: 1px solid #f5dfc0; border-radius: 8px;
+      padding: 14px 20px; min-width: 140px; text-align: center;
+    }
+    .stat-card .stat-value { font-size: 28px; font-weight: bold; color: #c0552a; }
+    .stat-card .stat-label { font-size: 12px; color: #a0673a; text-transform: uppercase; letter-spacing: 0.4px; margin-top: 2px; }
+
+    /* Daily counts table */
+    .table-wrapper { overflow-x: auto; }
+    #counts-table {
+      border-collapse: collapse; font-size: 12px; width: 100%;
+      min-width: 900px;
+    }
+    #counts-table th, #counts-table td {
+      padding: 7px 10px; text-align: center; border-bottom: 1px solid #f5dfc0; white-space: nowrap;
+    }
+    #counts-table thead tr:first-child th { background: #7d3c0f; color: white; font-size: 11px; }
+    #counts-table thead tr:nth-child(2) th { background: #fdebd0; color: #a0673a; font-size: 11px; }
+    #counts-table thead tr:nth-child(3) th { background: #fef5ec; color: #888; font-size: 10px; }
+    #counts-table tbody tr:hover td { background: #fef0e0; }
+    #counts-table .group-name { text-align: left; font-weight: bold; color: #7d3c0f; min-width: 80px; }
+    #counts-table .unique-col { background: #fef5ec; color: #a0673a; font-weight: bold; }
+    #counts-table .total-row td { background: #fdebd0; font-weight: bold; color: #7d3c0f; border-top: 2px solid #c0552a; }
+    #counts-table .zero { color: #ddd; }
+    #counts-table .week-sep { border-left: 2px solid #e8c9a8; }
+
+    /* Day-of-week color coding */
+    .day-M  { background: #f9f9f9; }
+    .day-Tu { background: #fffdf9; }
+    .day-W  { background: #f9f9f9; }
+    .day-Th { background: #fffdf9; }
+    .day-F  { background: #fff8f0; }
+
+    .loading-msg { text-align: center; padding: 40px; color: #aaa; }
+  </style>
+</head>
+<body>
+
+<nav>
+  <span class="brand">Daycare</span>
+  <a href="centers.html">Centers</a>
+  <a href="prospects.html">Prospects</a>
+  <a href="students.html">Students</a>
+</nav>
+
+<div class="container" style="max-width:1400px">
+  <div id="msg" class="msg"></div>
+
+  <div class="dashboard-header">
+    <h1 id="page-title">School Dashboard</h1>
+    <a href="centers.html" class="btn-cancel" style="padding:8px 16px;border-radius:6px;text-decoration:none;font-size:13px;">&#8592; Back to Centers</a>
+  </div>
+
+  <!-- Summary stats -->
+  <div class="stat-bar" id="stat-bar">
+    <div class="stat-card"><div class="stat-value" id="stat-total">—</div><div class="stat-label">Total Unique Campers</div></div>
+    <div class="stat-card"><div class="stat-value" id="stat-groups">—</div><div class="stat-label">Groups</div></div>
+    <div class="stat-card"><div class="stat-value" id="stat-weeks">—</div><div class="stat-label">Camp Weeks</div></div>
+    <div class="stat-card"><div class="stat-value" id="stat-peak">—</div><div class="stat-label">Peak Daily Count</div></div>
+  </div>
+
+  <!-- Daily counts grid -->
+  <div class="card">
+    <h2>Daily Attendance by Group</h2>
+    <div class="table-wrapper">
+      <table id="counts-table">
+        <thead id="table-head"></thead>
+        <tbody id="table-body"><tr><td class="loading-msg" colspan="100">Loading...</td></tr></tbody>
+      </table>
+    </div>
+  </div>
+</div>
+
+<script>
+  const params   = new URLSearchParams(location.search);
+  const centerId = params.get('center_id') || 1;
+  const centerName = params.get('name') || 'South Shore Day Summer Camp';
+
+  document.getElementById('page-title').textContent = centerName + ' — Dashboard';
+
+  const DAY_NAMES = ['Su','M','Tu','W','Th','F','Sa'];
+
+  function dayOfWeek(dateStr) {
+    const d = new Date(dateStr + 'T00:00:00Z');
+    return DAY_NAMES[d.getUTCDay()];
+  }
+
+  function formatDate(dateStr) {
+    const d = new Date(dateStr + 'T00:00:00Z');
+    return (d.getUTCMonth()+1) + '/' + d.getUTCDate();
+  }
+
+  async function load() {
+    try {
+      const res  = await fetch(`/api/centers/${centerId}/dashboard`);
+      const data = await res.json();
+      if (!res.ok) return showMsg(data.error, 'error');
+
+      const { dates, groups, grandTotal } = data;
+
+      // Stats
+      const weeks = [...new Set(dates.map(d => d.week))].length;
+      const peak  = Math.max(...dates.map(d => d.total));
+      document.getElementById('stat-total').textContent  = grandTotal;
+      document.getElementById('stat-groups').textContent = groups.length;
+      document.getElementById('stat-weeks').textContent  = weeks;
+      document.getElementById('stat-peak').textContent   = peak;
+
+      // Build weeks grouping for header
+      const weekBreaks = new Set();
+      let lastWeek = null;
+      dates.forEach((d, i) => {
+        if (d.week !== lastWeek) { weekBreaks.add(i); lastWeek = d.week; }
+      });
+
+      // Header row 1: Week spans
+      const weekCols = {};
+      dates.forEach(d => { weekCols[d.week] = (weekCols[d.week] || 0) + 1; });
+      const weekEntries = [...new Set(dates.map(d => d.week))].map(w => ({ week: w, span: weekCols[w] }));
+      const head = document.getElementById('table-head');
+      head.innerHTML = `
+        <tr>
+          <th rowspan="3" style="text-align:left">Group</th>
+          <th rowspan="3" class="unique-col">Unique</th>
+          ${weekEntries.map(w => `<th colspan="${w.span}">Week ${w.week}</th>`).join('')}
+        </tr>
+        <tr>
+          ${dates.map((d,i) => `<th class="${weekBreaks.has(i)?'week-sep':''}">${formatDate(d.date)}</th>`).join('')}
+        </tr>
+        <tr>
+          ${dates.map((d,i) => `<th class="day-${dayOfWeek(d.date)} ${weekBreaks.has(i)?'week-sep':''}">${dayOfWeek(d.date)}</th>`).join('')}
+        </tr>
+      `;
+
+      // Body rows
+      const tbody = document.getElementById('table-body');
+      const groupRows = groups.map(g => `
+        <tr>
+          <td class="group-name">${g.name}</td>
+          <td class="unique-col">${g.unique}</td>
+          ${g.daily.map((v,i) => `<td class="${v===0?'zero':''} ${weekBreaks.has(i)?'week-sep':''}">${v===0?'·':v}</td>`).join('')}
+        </tr>
+      `).join('');
+
+      // Daily total row
+      const totalRow = `
+        <tr class="total-row">
+          <td class="group-name">DAILY TOTAL</td>
+          <td class="unique-col">${grandTotal}</td>
+          ${dates.map((d,i) => `<td class="${weekBreaks.has(i)?'week-sep':''}">${d.total}</td>`).join('')}
+        </tr>
+      `;
+
+      tbody.innerHTML = groupRows + totalRow;
+    } catch(err) {
+      showMsg('Failed to load dashboard: ' + err.message, 'error');
+    }
+  }
+
+  function showMsg(text, type) {
+    const el = document.getElementById('msg');
+    el.textContent = text; el.className = 'msg ' + type;
+    setTimeout(() => el.className = 'msg', 4000);
+  }
+
+  load();
+</script>
+</body>
+</html>

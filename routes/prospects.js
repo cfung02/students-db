@@ -69,6 +69,22 @@ router.put('/:id', async (req, res) => {
   // Auto-log status change
   if (status !== current.status) {
     await addLog(data.id, 'status_changed', null, current.status, status);
+
+    // Sync student status if a linked student exists
+    if (student_id) {
+      const studentStatusMap = {
+        touring:   'touring',
+        enrolling: 'enrolling',
+        enrolled:  'active',
+        lost:      'withdrawn',
+      };
+      const newStudentStatus = studentStatusMap[status];
+      if (newStudentStatus) {
+        await supabase.from('students')
+          .update({ status: newStudentStatus })
+          .eq('id', student_id);
+      }
+    }
   }
 
   // Auto-log student conversion
