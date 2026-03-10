@@ -93,7 +93,7 @@ function parseRRDashboard(wb) {
 }
 
 // GET /api/centers/:id/dashboard
-router.get('/:id/dashboard', (req, res) => {
+router.get('/:id/dashboard', async (req, res) => {
   try {
     const id = String(req.params.id);
     let result;
@@ -104,6 +104,12 @@ router.get('/:id/dashboard', (req, res) => {
       const wb = XLSX.readFile(CAMP_FILE);
       result = parseCampDashboard(wb);
     }
+    // Override grandTotal with actual DB count for this center
+    const { count } = await supabase
+      .from('students')
+      .select('*', { count: 'exact', head: true })
+      .eq('center_id', req.params.id);
+    result.grandTotal = count || result.grandTotal;
     res.json(result);
   } catch (err) {
     console.error('[dashboard]', err.message);
