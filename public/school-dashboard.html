@@ -361,8 +361,8 @@
   function switchTab(tab, btn) {
     document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
     btn.classList.add('active');
-    document.getElementById('daily-count-view').style.display = tab === 'daily' ? '' : 'none';
-    document.getElementById('group-count-view').style.display = tab === 'groups' ? '' : 'none';
+    document.getElementById('daily-count-view').style.display = tab === 'daily' ? 'block' : 'none';
+    document.getElementById('group-count-view').style.display = tab === 'groups' ? 'block' : 'none';
     const filter = document.querySelector('.date-filter');
     if (filter && filter.style.display !== 'none') {
       filter.style.display = tab === 'daily' ? '' : 'none';
