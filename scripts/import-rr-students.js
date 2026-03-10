@@ -62,6 +62,7 @@ async function run() {
       shirt_size:    r[col.shirt_size] ? String(r[col.shirt_size]).trim() : null,
       enrolled_date: excelDateToISO(r[col.enrolled_date]),
       status:        'active',
+      center_id:     CENTER_ID,
     }));
 
     const { data: students, error: sErr } = await supabase
