@@ -78,6 +78,32 @@
 
     .loading-msg { text-align: center; padding: 40px; color: #aaa; }
     .no-data-msg { text-align: center; padding: 40px; color: #c0552a; font-size: 13px; }
+
+    /* Tabs */
+    .tab-bar {
+      display: flex; gap: 4px; margin-bottom: 20px;
+      border-bottom: 2px solid #f5dfc0;
+    }
+    .tab-btn {
+      padding: 9px 22px; font-size: 13px; font-weight: 600; cursor: pointer;
+      border: none; background: none; color: #a0673a;
+      border-bottom: 3px solid transparent; margin-bottom: -2px;
+    }
+    .tab-btn:hover { color: #7d3c0f; }
+    .tab-btn.active { color: #7d3c0f; border-bottom-color: #c0552a; }
+
+    /* Group count table */
+    #group-count-view { display: none; }
+    #group-count-table {
+      border-collapse: collapse; font-size: 13px; width: 100%; max-width: 400px;
+    }
+    #group-count-table th, #group-count-table td {
+      padding: 10px 16px; text-align: left; border-bottom: 1px solid #f5dfc0;
+    }
+    #group-count-table thead th { background: #7d3c0f; color: white; font-size: 12px; }
+    #group-count-table tbody tr:hover td { background: #fef0e0; }
+    #group-count-table .count-col { text-align: center; font-weight: bold; color: #c0552a; }
+    #group-count-table .total-row td { background: #fdebd0; font-weight: bold; color: #7d3c0f; border-top: 2px solid #c0552a; }
   </style>
 </head>
 <body>
@@ -105,6 +131,12 @@
     <div class="stat-card"><div class="stat-value" id="stat-peak">—</div><div class="stat-label">Peak Daily Count</div></div>
   </div>
 
+  <!-- Tabs -->
+  <div class="tab-bar">
+    <button class="tab-btn active" onclick="switchTab('daily')">Daily Count</button>
+    <button class="tab-btn" onclick="switchTab('groups')">Group Count</button>
+  </div>
+
   <!-- Date filter -->
   <div class="date-filter">
     <label>Start Date <input type="date" id="start-date"/></label>
@@ -115,12 +147,25 @@
   </div>
 
   <!-- Daily counts grid -->
-  <div class="card">
-    <h2>Daily Attendance by Group</h2>
-    <div class="table-wrapper">
-      <table id="counts-table">
-        <thead id="table-head"></thead>
-        <tbody id="table-body"><tr><td class="loading-msg" colspan="100">Loading...</td></tr></tbody>
+  <div id="daily-count-view">
+    <div class="card">
+      <h2>Daily Attendance by Group</h2>
+      <div class="table-wrapper">
+        <table id="counts-table">
+          <thead id="table-head"></thead>
+          <tbody id="table-body"><tr><td class="loading-msg" colspan="100">Loading...</td></tr></tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+
+  <!-- Group counts -->
+  <div id="group-count-view">
+    <div class="card">
+      <h2>Students per Group</h2>
+      <table id="group-count-table">
+        <thead><tr><th>Group</th><th class="count-col"># Students</th></tr></thead>
+        <tbody id="group-count-body"><tr><td class="loading-msg" colspan="2">Loading...</td></tr></tbody>
       </table>
     </div>
   </div>
@@ -172,6 +217,8 @@
         }
         renderTable(allDates, allGroups, grandTotal);
       }
+
+      if (data.groupCounts) renderGroupCounts(data.groupCounts);
     } catch(err) {
       showMsg('Failed to load dashboard: ' + err.message, 'error');
     }
@@ -309,6 +356,31 @@
     document.getElementById('stat-groups').textContent = groups.length;
     document.getElementById('stat-weeks').textContent  = weeks;
     document.getElementById('stat-peak').textContent   = peak;
+  }
+
+  function switchTab(tab) {
+    document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
+    event.target.classList.add('active');
+    document.getElementById('daily-count-view').style.display = tab === 'daily' ? '' : 'none';
+    document.getElementById('group-count-view').style.display = tab === 'groups' ? '' : 'none';
+    const filter = document.querySelector('.date-filter');
+    if (filter) filter.style.display = tab === 'daily' && filter.dataset.hasFilter === 'true' ? '' : (tab === 'daily' ? filter.style.display : 'none');
+  }
+
+  function renderGroupCounts(groupCounts) {
+    const total = groupCounts.reduce((s, g) => s + g.count, 0);
+    const rows  = groupCounts.map(g => `
+      <tr>
+        <td>${g.name}</td>
+        <td class="count-col">${g.count}</td>
+      </tr>
+    `).join('');
+    document.getElementById('group-count-body').innerHTML = rows + `
+      <tr class="total-row">
+        <td>TOTAL</td>
+        <td class="count-col">${total}</td>
+      </tr>
+    `;
   }
 
   function showMsg(text, type) {

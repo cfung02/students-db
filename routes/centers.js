@@ -93,6 +93,21 @@ router.get('/:id/dashboard', async (req, res) => {
       .select('*', { count: 'exact', head: true })
       .eq('center_id', req.params.id);
     result.grandTotal = count || result.grandTotal;
+
+    // Group counts from DB
+    const { data: enrollments } = await supabase
+      .from('enrollments')
+      .select('group_name')
+      .eq('center_id', req.params.id)
+      .not('group_name', 'is', null);
+    const groupMap = {};
+    (enrollments || []).forEach(r => {
+      groupMap[r.group_name] = (groupMap[r.group_name] || 0) + 1;
+    });
+    result.groupCounts = Object.entries(groupMap)
+      .map(([name, count]) => ({ name, count }))
+      .sort((a, b) => a.name.localeCompare(b.name));
+
     res.json(result);
   } catch (err) {
     console.error('[dashboard]', err.message);
