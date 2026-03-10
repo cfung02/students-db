@@ -133,8 +133,8 @@
 
   <!-- Tabs -->
   <div class="tab-bar">
-    <button class="tab-btn active" onclick="switchTab('daily')">Daily Count</button>
-    <button class="tab-btn" onclick="switchTab('groups')">Group Count</button>
+    <button class="tab-btn active" onclick="switchTab('daily', this)">Daily Count</button>
+    <button class="tab-btn" onclick="switchTab('groups', this)">Group Count</button>
   </div>
 
   <!-- Date filter -->
@@ -358,13 +358,15 @@
     document.getElementById('stat-peak').textContent   = peak;
   }
 
-  function switchTab(tab) {
+  function switchTab(tab, btn) {
     document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
-    event.target.classList.add('active');
+    btn.classList.add('active');
     document.getElementById('daily-count-view').style.display = tab === 'daily' ? '' : 'none';
     document.getElementById('group-count-view').style.display = tab === 'groups' ? '' : 'none';
     const filter = document.querySelector('.date-filter');
-    if (filter) filter.style.display = tab === 'daily' && filter.dataset.hasFilter === 'true' ? '' : (tab === 'daily' ? filter.style.display : 'none');
+    if (filter && filter.style.display !== 'none') {
+      filter.style.display = tab === 'daily' ? '' : 'none';
+    }
   }
 
   function renderGroupCounts(groupCounts) {
